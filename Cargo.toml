@@ -1,7 +1,10 @@
 [package]
 name = "bui_basic"
-version = "0.1.0"
+version = "0.0.1"
 edition = "2021"
+description = "Simplified wrapper around bui for building guis"
+repository = "https://github.com/clay53/bui_basic"
+license-file = "LICENSE"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
