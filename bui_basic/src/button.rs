@@ -1,6 +1,6 @@
 use bui::rect::{SizeAndCenter, Points};
 
-use crate::{construct::Construct, containers::{Fill, Init, GetHeight}, signal::{SignalReciever, ResizedSignal, CursorMovedSignal, MouseLeftDownSignal, MouseLeftUpSignal}};
+use crate::{construct::Construct, containers::{Fill, Init, GetHeight, TranslateY, TranslateX}, signal::{SignalReciever, ResizedSignal, CursorMovedSignal, MouseLeftDownSignal, MouseLeftUpSignal, CharacterInputSignal}};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum PressState {
@@ -48,6 +48,24 @@ impl<T: Fill> Fill for Button<T> {
     }
 }
 
+impl <T: TranslateX> TranslateX for Button<T> {
+    fn translate_x(&mut self, dx: f32) {
+        self.fill_area.cx += dx;
+        self.points.p1y += dx;
+        self.points.p2y += dx;
+        self.child.translate_x(dx);
+    }
+}
+
+impl <T: TranslateY> TranslateY for Button<T> {
+    fn translate_y(&mut self, dy: f32) {
+        self.fill_area.cy += dy;
+        self.points.p1y += dy;
+        self.points.p2y += dy;
+        self.child.translate_y(dy);
+    }
+}
+
 impl<T> GetHeight for Button<T> {
     fn get_height(&self) -> f32 {
         self.fill_area.sy*2.0
@@ -82,6 +100,13 @@ impl<T> SignalReciever<CursorMovedSignal, PressStateCallback> for Button<T> {
     }
 }
 
+impl<T, R: Default> SignalReciever<CursorMovedSignal, R> for Button<T> {
+    fn take_signal(&mut self, signal: &mut CursorMovedSignal) -> R {
+        let _: PressStateCallback = self.take_signal(signal);
+        R::default()
+    }
+}
+
 impl<T> SignalReciever<MouseLeftDownSignal, PressStateCallback> for Button<T> {
     fn take_signal(&mut self, _signal: &mut MouseLeftDownSignal) -> PressStateCallback {
         match self.press_state {
@@ -94,6 +119,13 @@ impl<T> SignalReciever<MouseLeftDownSignal, PressStateCallback> for Button<T> {
     }
 }
 
+impl<T, R: Default> SignalReciever<MouseLeftDownSignal, R> for Button<T> {
+    fn take_signal(&mut self, signal: &mut MouseLeftDownSignal) -> R {
+        let _: PressStateCallback = self.take_signal(signal);
+        R::default()
+    }
+}
+
 impl<T> SignalReciever<MouseLeftUpSignal, ClickedCallback> for Button<T> {
     fn take_signal(&mut self, _signal: &mut MouseLeftUpSignal) -> ClickedCallback {
         if self.press_state == PressState::Pressed {
@@ -102,6 +134,19 @@ impl<T> SignalReciever<MouseLeftUpSignal, ClickedCallback> for Button<T> {
         } else {
             ClickedCallback::NoClick
         }
+    }
+}
+
+impl<T, R: Default> SignalReciever<MouseLeftUpSignal, R> for Button<T> {
+    fn take_signal(&mut self, signal: &mut MouseLeftUpSignal) -> R {
+        let _: ClickedCallback = self.take_signal(signal);
+        R::default()
+    }
+}
+
+impl<T, R: Default> SignalReciever<CharacterInputSignal, R> for Button<T> {
+    fn take_signal(&mut self, _signal: &mut CharacterInputSignal) -> R {
+        R::default()
     }
 }
 

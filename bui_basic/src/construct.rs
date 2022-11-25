@@ -7,6 +7,7 @@ pub trait Construct<C> {
 pub trait StandardConstructTarget {
     const EMPTY: Self;
     fn append(&mut self, value: Self);
+    fn append_into(self, value: Self) -> Self;
 }
 
 #[derive(Debug, Clone)]
@@ -18,6 +19,17 @@ impl StandardConstructTarget for LineTarget {
     fn append(&mut self, mut value: Self) {
         self.0.append(&mut value.0)
     }
+
+    fn append_into(mut self, mut value: Self) -> Self {
+        self.0.append(&mut value.0);
+        self
+    }
+}
+
+impl Default for LineTarget {
+    fn default() -> Self {
+        Self::EMPTY
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -28,5 +40,10 @@ impl StandardConstructTarget for Freeform2DCapsuleTarget {
 
     fn append(&mut self, mut value: Self) {
         self.0.append(&mut value.0);
+    }
+
+    fn append_into(mut self, mut value: Self) -> Self {
+        self.0.append(&mut value.0);
+        self
     }
 }

@@ -1,13 +1,14 @@
 use std::sync::{Arc, Mutex};
 
-use bui::{ttf::CachedFace, ttf_outline::{compute_unfit_chars, compute_square_transform, transform_lines, transform_points, transform_points_vec}, rect::{SizeAndCenter, Points}, line::LineRaw};
+use bui::{ttf::CachedFace, ttf_outline::{compute_unfit_chars, compute_square_transform, transform_lines, transform_points, transform_points_vec, compute_square_transform_by_width}, rect::{SizeAndCenter, Points}, line::LineRaw};
 
-use crate::{construct::{LineTarget, Construct}, containers::{Fill, GetPointBounds, GetCenterPosition}, signal::{SignalReciever, ResizedSignal, CursorMovedSignal, MouseLeftDownSignal, MouseLeftUpSignal, ReconstructCallback}};
+use crate::{construct::{LineTarget, Construct}, containers::{Fill, GetPointBounds, GetCenterPosition, FillWidth, TranslateY, TranslateX, Init}, signal::{SignalReciever, ResizedSignal, CursorMovedSignal, MouseLeftDownSignal, MouseLeftUpSignal, ReconstructCallback, CharacterInputSignal}};
 
 #[derive(Debug, Clone)]
 pub enum TextSizeMode {
     Unconstrained,
     Fill(SizeAndCenter),
+    FillWidth(f32, f32, f32),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -110,6 +111,15 @@ impl Text {
             TextSizeMode::Fill(fill_target) => {
                 let (mut lines, mut chars_bounds, mut char_bounds) = compute_unfit_chars(&mut self.face.lock().unwrap(), self.text.as_str(), 5);
                 let transform = compute_square_transform(chars_bounds, fill_target, self.resx, self.resy);
+                transform_lines(&mut lines, transform);
+                transform_points(&mut chars_bounds, transform);
+                transform_points_vec(&mut char_bounds, transform);
+
+                (Some(lines), Some(chars_bounds), Some(char_bounds))
+            },
+            TextSizeMode::FillWidth(sx, cx, ty) => {
+                let (mut lines, mut chars_bounds, mut char_bounds) = compute_unfit_chars(&mut self.face.lock().unwrap(), self.text.as_str(), 5);
+                let transform = compute_square_transform_by_width(chars_bounds, sx, cx, ty, self.resx, self.resy);
                 transform_lines(&mut lines, transform);
                 transform_points(&mut chars_bounds, transform);
                 transform_points_vec(&mut char_bounds, transform);
@@ -236,11 +246,97 @@ impl Construct<LineTarget> for Text {
     }
 }
 
+impl Init for Text {
+    fn init(&mut self) {}
+}
+
 impl Fill for Text {
     fn fill(&mut self, fill_target: SizeAndCenter) {
         self.size_mode = TextSizeMode::Fill(fill_target);
         self.compute_chars();
         self.compute_selection_lines();
+    }
+}
+
+impl FillWidth for Text {
+    fn fill_width(&mut self, sx: f32, cx: f32, ty: f32) -> f32 {
+        todo!()
+    }
+}
+
+impl TranslateX for Text {
+    fn translate_x(&mut self, dx: f32) {
+        match &mut self.size_mode {
+            TextSizeMode::Fill(size_and_center) => {
+                size_and_center.cx += dx;
+
+                if let Some(chars_bounds) = self.chars_bounds.as_mut() {
+                    chars_bounds.p1x += dx;
+                    chars_bounds.p2x += dx;
+                }
+
+                if let Some(lines) = self.lines.as_mut() {
+                    for line in lines {
+                        line.p1[0] += dx;
+                        line.p2[0] += dx;
+                    }
+                }
+                
+                if let Some(chars_bounds) = self.char_bounds.as_mut() {
+                    for point in chars_bounds {
+                        point.p1x += dx;
+                        point.p2x += dx;
+                    }
+                }
+                
+                if let Some(selection_lines) = self.selection_lines.as_mut() {
+                    for line in selection_lines {
+                        line.p1[0] += dx;
+                        line.p2[0] += dx;
+                    }
+                }
+            },
+            TextSizeMode::FillWidth(_, _, _) => todo!(),
+            TextSizeMode::Unconstrained => todo!(),
+        }
+    }
+}
+
+impl TranslateY for Text {
+    fn translate_y(&mut self, dy: f32) {
+        match &mut self.size_mode {
+            TextSizeMode::Fill(size_and_center) => {
+                size_and_center.cy += dy;
+
+                if let Some(chars_bounds) = self.chars_bounds.as_mut() {
+                    chars_bounds.p1y += dy;
+                    chars_bounds.p2y += dy;
+                }
+
+                if let Some(lines) = self.lines.as_mut() {
+                    for line in lines {
+                        line.p1[1] += dy;
+                        line.p2[1] += dy;
+                    }
+                }
+                
+                if let Some(chars_bounds) = self.char_bounds.as_mut() {
+                    for point in chars_bounds {
+                        point.p1y += dy;
+                        point.p2y += dy;
+                    }
+                }
+                
+                if let Some(selection_lines) = self.selection_lines.as_mut() {
+                    for line in selection_lines {
+                        line.p1[1] += dy;
+                        line.p2[1] += dy;
+                    }
+                }
+            },
+            TextSizeMode::FillWidth(_, _, _) => todo!(),
+            TextSizeMode::Unconstrained => todo!(),
+        }
     }
 }
 
@@ -285,6 +381,13 @@ impl SignalReciever<CursorMovedSignal, (ReconstructCallback<LineTarget>, SelectS
     }
 }
 
+impl SignalReciever<CursorMovedSignal, ReconstructCallback<LineTarget>> for Text {
+    fn take_signal(&mut self, signal: &mut CursorMovedSignal) -> ReconstructCallback<LineTarget> {
+        let (reconstruct_callback, _): (ReconstructCallback<LineTarget>, SelectStateCallback) = self.take_signal(signal);
+        reconstruct_callback
+    }
+}
+
 impl SignalReciever<MouseLeftDownSignal, (ReconstructCallback<LineTarget>, SelectStateCallback)> for Text {
     fn take_signal(&mut self, _signal: &mut MouseLeftDownSignal) -> (ReconstructCallback<LineTarget>, SelectStateCallback) {
         match self.pos_to_select_point(self.mousex, self.mousey) {
@@ -311,6 +414,13 @@ impl SignalReciever<MouseLeftDownSignal, (ReconstructCallback<LineTarget>, Selec
     }
 }
 
+impl SignalReciever<MouseLeftDownSignal, ReconstructCallback<LineTarget>> for Text {
+    fn take_signal(&mut self, signal: &mut MouseLeftDownSignal) -> ReconstructCallback<LineTarget> {
+        let (reconstruct_callback, _) = self.take_signal(signal);
+        reconstruct_callback
+    }
+}
+
 impl SignalReciever<MouseLeftUpSignal, SelectStateCallback> for Text {
     fn take_signal(&mut self, _signal: &mut MouseLeftUpSignal) -> SelectStateCallback {
         match &self.select_state {
@@ -326,6 +436,19 @@ impl SignalReciever<MouseLeftUpSignal, SelectStateCallback> for Text {
     }
 }
 
+impl<R: Default> SignalReciever<MouseLeftUpSignal, R> for Text {
+    fn take_signal(&mut self, signal: &mut MouseLeftUpSignal) -> R {
+        let _: SelectStateCallback = self.take_signal(signal);
+        R::default()
+    }
+}
+
+impl<R: Default> SignalReciever<CharacterInputSignal, R> for Text {
+    fn take_signal(&mut self, _signal: &mut CharacterInputSignal) -> R {
+        R::default()
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum SelectStateCallback {
     NoChange,
@@ -336,6 +459,7 @@ impl GetPointBounds for Text {
     fn get_point_bounds(&self) -> Points {
         match self.size_mode {
             TextSizeMode::Fill(fill_target) => fill_target.into(),
+            TextSizeMode::FillWidth(sx, cx, ty) => todo!(),
             TextSizeMode::Unconstrained => Points::ZERO,
         }
     }
@@ -345,6 +469,7 @@ impl GetCenterPosition for Text {
     fn get_center_position(&self) -> (f32, f32) {
         match self.size_mode {
             TextSizeMode::Fill(fill) => (fill.cx, fill.cy),
+            TextSizeMode::FillWidth(sx, cx, ty) => todo!(),
             TextSizeMode::Unconstrained => todo!()
         }
     }

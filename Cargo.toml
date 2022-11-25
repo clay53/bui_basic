@@ -1,23 +1,6 @@
-[package]
-name = "bui_basic"
-version = "0.0.1"
-edition = "2021"
-description = "Simplified wrapper around bui for building guis"
-repository = "https://github.com/clay53/bui_basic"
-license-file = "LICENSE"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[dependencies]
-# bui = { path = "../bui" }
-bui = { git = "https://github.com/clay53/bui", rev = "9496ba9" }
-log = "0.4"
-
-[dev-dependencies]
-futures = "0.3"
-winit = "0.26"
-
-[target.'cfg(target_os = "android")'.dependencies]
-jni = "0.19"
-# ndk-context = "0.1.1"
-ndk-context = { git = "https://github.com/rust-windowing/android-ndk-rs", rev = "7e33384" }
+[workspace]
+resolver = "2"
+members = [
+    "bui_basic",
+    "bui_basic_derive",
+]
